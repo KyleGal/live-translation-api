@@ -2,7 +2,7 @@ import os
 from flask import Flask
 from flask_cors import CORS
 from dotenv import load_dotenv
-from routes.translate import translate_bp
+from routes.translate import translate_bp, init_whisper_model
 
 # Load environment variables
 load_dotenv()
@@ -10,6 +10,10 @@ load_dotenv()
 # Create Flask app
 app = Flask(__name__)
 CORS(app)
+
+# Initialize Whisper model at startup
+with app.app_context():
+    init_whisper_model()
 
 # Register blueprints
 app.register_blueprint(translate_bp, url_prefix='/api/translate')

@@ -1,5 +1,13 @@
+# Web Framework
 Flask==3.0.0
 Flask-CORS==4.0.0
 python-dotenv==1.0.0
+
+# Audio Transcription
 openai-whisper
-websockets
+SpeechRecognition==3.10.0
+PyAudio==0.2.14
+numpy
+
+# Production Server
+gunicorn==21.2.0
