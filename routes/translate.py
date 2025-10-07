@@ -32,12 +32,11 @@ def translate_verbatim():
     Streaming endpoint that transcribes audio bytes to verbatim text
 
     Request:
-    - Content-Type: application/octet-stream (raw audio bytes stream - 16-bit PCM)
+    - Content-Type: application/octet-stream (raw audio bytes - 16-bit PCM)
     - Headers:
       - X-Source-Language: Source language code (optional, default: auto-detect)
       - X-Target-Language: Target language code (optional, default: en)
       - X-Sample-Rate: Sample rate in Hz (optional, default: 16000)
-      - X-Chunk-Size: Audio chunk size in bytes (optional, default: 8192)
 
     Response:
     Server-Sent Events (SSE) stream with JSON objects:
@@ -58,108 +57,59 @@ def translate_verbatim():
     source_language = request.headers.get('X-Source-Language', 'auto')
     target_language = request.headers.get('X-Target-Language', 'en')
     sample_rate = int(request.headers.get('X-Sample-Rate', '16000'))
-    chunk_size = int(request.headers.get('X-Chunk-Size', '8192'))
 
-    # Thread safe Queue for passing data from the stream reader
-    data_queue = Queue()
-    # Flag to signal when streaming is complete
-    stream_complete = threading.Event()
+    # Read all audio data from request body
+    try:
+        audio_data = request.get_data()
 
-    # Bytes object which holds audio data for the current phrase
-    phrase_bytes = bytes()
-    # The last time audio data was retrieved from the queue
-    phrase_time = None
-    # Timeout times
-    phrase_timeout = 3
+        if not audio_data:
+            return jsonify({
+                'success': False,
+                'error': 'No audio data provided'
+            }), 400
 
-    def stream_reader():
-        """
-        Background thread that reads raw audio bytes from request stream
-        and adds them to the data queue
-        """
-        try:
-            while True:
-                chunk = request.stream.read(chunk_size)
-                if not chunk:
-                    break
-                data_queue.put(chunk)
-            stream_complete.set()
-        except Exception as e:
-            print(f"Error reading stream: {e}")
-            stream_complete.set()
+        def generate_transcriptions():
+            """
+            Generator function that yields transcription updates as SSE
+            """
+            try:
+                yield f"data: {json.dumps({'type': 'status', 'message': 'Ready to transcribe'})}\n\n"
 
-    # Start background thread to read from request stream
-    reader_thread = threading.Thread(target=stream_reader, daemon=True)
-    reader_thread.start()
+                # Only transcribe if we have enough data (at least 0.5 seconds of audio)
+                min_samples = int(sample_rate * 0.5)  # 0.5 seconds
+                if len(audio_data) >= min_samples * 2:  # 2 bytes per sample (16-bit)
+                    # Convert to numpy array
+                    audio_np = np.frombuffer(audio_data, dtype=np.int16).astype(np.float32) / 32768.0
 
-    def generate_transcriptions():
-        """
-        Generator function that yields transcription updates as SSE
-        """
-        nonlocal phrase_bytes, phrase_time
+                    # Transcribe
+                    result = whisper_model.transcribe(
+                        audio_np,
+                        language=None if source_language == 'auto' else source_language,
+                        fp16=False
+                    )
+                    text = result['text'].strip()
 
-        transcription = ['']
+                    # Yield transcription update
+                    now = datetime.now()
+                    yield f"data: {json.dumps({'type': 'transcription', 'text': text, 'is_final': True, 'timestamp': now.isoformat()})}\n\n"
 
-        try:
-            yield f"data: {json.dumps({'type': 'status', 'message': 'Ready to transcribe'})}\n\n"
-
-            while not stream_complete.is_set() or not data_queue.empty():
-                now = datetime.now()
-
-                if not data_queue.empty():
-                    phrase_complete = False
-
-                    # If enough time has passed, consider the phrase complete
-                    if phrase_time and now - phrase_time > timedelta(seconds=phrase_timeout):
-                        phrase_bytes = bytes()
-                        phrase_complete = True
-
-                    phrase_time = now
-
-                    # Get all available audio data from queue
-                    audio_chunks = []
-                    while not data_queue.empty():
-                        try:
-                            audio_chunks.append(data_queue.get_nowait())
-                        except:
-                            break
-
-                    audio_data = b''.join(audio_chunks)
-                    phrase_bytes += audio_data
-
-                    # Only transcribe if we have enough data (at least 0.5 seconds of audio)
-                    min_samples = int(sample_rate * 0.5)  # 0.5 seconds
-                    if len(phrase_bytes) >= min_samples * 2:  # 2 bytes per sample (16-bit)
-                        # Convert to numpy array
-                        audio_np = np.frombuffer(phrase_bytes, dtype=np.int16).astype(np.float32) / 32768.0
-
-                        # Transcribe
-                        result = whisper_model.transcribe(
-                            audio_np,
-                            language=None if source_language == 'auto' else source_language,
-                            fp16=False
-                        )
-                        text = result['text'].strip()
-
-                        if phrase_complete:
-                            transcription.append(text)
-                        else:
-                            transcription[-1] = text
-
-                        # Yield transcription update
-                        yield f"data: {json.dumps({'type': 'transcription', 'text': text, 'is_final': phrase_complete, 'timestamp': now.isoformat()})}\n\n"
+                    # Send final transcription
+                    yield f"data: {json.dumps({'type': 'final', 'text': text, 'timestamp': datetime.now().isoformat()})}\n\n"
                 else:
-                    sleep(0.1)
+                    yield f"data: {json.dumps({'type': 'error', 'message': 'Audio too short'})}\n\n"
 
-            # Send final transcription
-            final_text = ' '.join(transcription).strip()
-            yield f"data: {json.dumps({'type': 'final', 'text': final_text, 'timestamp': datetime.now().isoformat()})}\n\n"
+            except Exception as e:
+                yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
 
-        except Exception as e:
-            yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
+        # Return SSE stream
+        return Response(generate_transcriptions(), mimetype='text/event-stream')
 
-    # Return SSE stream
-    return Response(generate_transcriptions(), mimetype='text/event-stream')
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': 'Failed to process audio',
+            'message': str(e)
+        }), 500
 
 
 @translate_bp.route('/summary', methods=['POST'])

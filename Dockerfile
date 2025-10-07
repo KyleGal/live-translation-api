@@ -10,10 +10,15 @@ RUN pip install -U openai-whisper
 # Set working directory
 WORKDIR /app
 
-# Install system dependencies for audio processing
+# Install system dependencies for audio processing and building Python packages
 RUN apt-get update && apt-get install -y \
     ffmpeg \
     curl \
+    gcc \
+    g++ \
+    make \
+    portaudio19-dev \
+    python3-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements first for better caching

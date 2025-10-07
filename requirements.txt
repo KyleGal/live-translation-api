@@ -7,5 +7,9 @@ python-dotenv==1.0.0
 openai-whisper
 numpy
 
+# Audio Capture & Speech Detection
+pyaudio
+webrtcvad
+
 # Production Server
 gunicorn==21.2.0
