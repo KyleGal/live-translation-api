@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """
-Test client for streaming live audio to /verbatim endpoint
+Test client for streaming live audio to /transcription endpoint
 Captures audio from microphone, detects speech, and streams to server in real-time
 with live transcription updates
+Also saves all captured audio to a WAV file when the session ends
 """
 import requests
 import numpy as np
@@ -17,6 +18,7 @@ from datetime import datetime, timedelta
 import json
 import os
 import select
+import wave
 
 # Audio recording parameters
 SAMPLE_RATE = 16000
@@ -55,12 +57,16 @@ class AudioStreamer:
         self.transcription_text = ""  # Full paragraph of all transcriptions
         self.current_transcription = ""  # Current segment being transcribed
 
+        # Audio recording storage (for saving to file)
+        self.all_audio_frames = []  # Store all audio frames for saving
+
     def start(self):
         """Start audio capture and streaming"""
         print("Starting live audio capture...")
         print(f"Sample rate: {SAMPLE_RATE} Hz")
         print(f"VAD mode: {VAD_MODE} (aggressiveness)")
         print(f"Live updates every: {TRANSCRIPTION_UPDATE_INTERVAL}s")
+        print(f"Audio will be saved when session ends")
         print(f"Listening for speech... (Press 'q' + Enter or Ctrl+C to stop)\n")
 
         self.is_running = True
@@ -96,6 +102,9 @@ class AudioStreamer:
         """Callback for audio stream - processes each chunk"""
         if not self.is_running:
             return (None, pyaudio.paComplete)
+
+        # Store all audio frames for later saving
+        self.all_audio_frames.append(in_data)
 
         # Check if chunk contains speech using VAD
         is_speech = self.vad.is_speech(in_data, SAMPLE_RATE)
@@ -307,6 +316,32 @@ class AudioStreamer:
         else:
             print("[No transcription yet]")
 
+    def save_audio(self):
+        """Save recorded audio to WAV file"""
+        if not self.all_audio_frames:
+            print("\nNo audio recorded to save.")
+            return None
+
+        # Generate filename with timestamp
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"recording_{timestamp}.wav"
+
+        try:
+            # Combine all audio frames
+            audio_data = b''.join(self.all_audio_frames)
+
+            # Save to WAV file
+            with wave.open(filename, 'wb') as wf:
+                wf.setnchannels(CHANNELS)
+                wf.setsampwidth(self.audio.get_sample_size(FORMAT))
+                wf.setframerate(SAMPLE_RATE)
+                wf.writeframes(audio_data)
+
+            return filename
+        except Exception as e:
+            print(f"\n❌ Error saving audio: {e}")
+            return None
+
     def stop(self):
         """Stop audio capture"""
         self.is_running = False
@@ -314,6 +349,9 @@ class AudioStreamer:
             self.stream.stop_stream()
             self.stream.close()
         self.audio.terminate()
+
+        # Save audio to file
+        saved_file = self.save_audio()
 
         # Print final summary
         print("\n" + "=" * 80)
@@ -348,10 +386,14 @@ class AudioStreamer:
 
         print()
         print("=" * 80)
+
+        if saved_file:
+            print(f"\n✅ Audio saved to: {saved_file}")
+
         print("\nAudio capture stopped.")
 
 def main():
-    url = "http://localhost:3000/api/translate/verbatim"
+    url = "http://localhost:3000/api/translate/transcription"
 
     streamer = AudioStreamer(url)
     streamer.start()

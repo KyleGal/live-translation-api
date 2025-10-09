@@ -42,12 +42,12 @@ Live Translate API is a RESTful service designed to provide real-time audio tran
 
 ### 🚧 In Development
 - Translation between languages
-- Text summarization capabilities
+- Speaker diarization capabilities
 - Additional Whisper model options (small, medium, large)
 
 ### 📋 Planned Features
 - Multi-language support with auto-detection
-- Configurable summary lengths (short, medium, long)
+- Speaker identification and segmentation
 - Translation service integration (Google Translate, DeepL)
 - Docker containerization
 - Database storage for transcriptions
@@ -57,7 +57,7 @@ Live Translate API is a RESTful service designed to provide real-time audio tran
 **Phase:** Core Implementation ✅ | Enhancement 🚧
 
 Current implementation includes:
-- Fully functional `/verbatim` endpoint for live transcription
+- Fully functional `/transcription` endpoint for live transcription
 - Client application with VAD and live updates
 - Real-time paragraph-format display
 - Production-ready audio processing pipeline
@@ -75,7 +75,7 @@ WebRTC VAD (Mode 2) - Speech Detection
     ↓
 Queue-based Audio Accumulator
     ↓ (Every 1.5s while speaking)
-Flask API (/api/translate/verbatim)
+Flask API (/api/translate/transcription)
     ↓
 Whisper Model (base)
     ↓ (SSE Stream)
@@ -227,11 +227,11 @@ The `test_stream.py` client provides live microphone transcription with real-tim
 
 #### Manual Testing with cURL
 
-**Test the verbatim endpoint with raw audio:**
+**Test the transcription endpoint with raw audio:**
 ```bash
 # Record 3 seconds of audio and send to server
 sox -d -r 16000 -c 1 -b 16 -e signed-integer -t raw - trim 0 3 | \
-curl -X POST http://localhost:3000/api/translate/verbatim \
+curl -X POST http://localhost:3000/api/translate/transcription \
   -H "Content-Type: application/octet-stream" \
   -H "X-Source-Language: en" \
   -H "X-Sample-Rate: 16000" \
@@ -254,9 +254,9 @@ curl -X POST http://localhost:3000/api/translate/verbatim \
 }
 ```
 
-### Verbatim Transcription
+### Live Transcription
 
-**Endpoint:** `POST /api/translate/verbatim`
+**Endpoint:** `POST /api/translate/transcription`
 
 **Description:** Transcribe raw audio bytes to verbatim text with Server-Sent Events streaming
 
@@ -297,13 +297,13 @@ data: {"type": "final", "text": "Hello world", "timestamp": "2025-10-06T12:00:00
 {"type": "error", "message": "Audio too short"}
 ```
 
-### Summary Endpoint (Not Yet Implemented)
+### Speaker Diarization (Not Yet Implemented)
 
-**Endpoint:** `POST /api/translate/summary`
+**Endpoint:** `POST /api/translate/diarization`
 
 **Status:** Placeholder - Returns TODO messages
 
-This endpoint is planned for future implementation with translation and summarization features.
+This endpoint is planned for future implementation with speaker diarization features to identify and segment different speakers in audio.
 
 ## Key Technologies
 
@@ -372,7 +372,7 @@ live-translate-api/
 
 #### Core Application
 - **app.py**: Main Flask application with CORS, Whisper model initialization, and route registration
-- **routes/translate.py**: Blueprint containing `/verbatim` (implemented) and `/summary` (placeholder) endpoints
+- **routes/translate.py**: Blueprint containing `/transcription` (implemented) and `/diarization` (placeholder) endpoints
 
 #### Client Tools
 - **test_stream.py**: Live transcription client with:
@@ -434,7 +434,7 @@ VAD_MODE = 1  # Try less aggressive mode
 ## Development Roadmap
 
 ### ✅ Phase 1: Core Transcription (Completed)
-- [x] Flask API with `/verbatim` endpoint
+- [x] Flask API with `/transcription` endpoint
 - [x] Whisper model integration
 - [x] Live transcription client with VAD
 - [x] Queue-based audio processing
@@ -450,12 +450,12 @@ VAD_MODE = 1  # Try less aggressive mode
 - [ ] Docker deployment configuration
 - [ ] Unit tests and integration tests
 
-### 📋 Phase 3: Translation & Summarization
+### 📋 Phase 3: Translation & Diarization
 - [ ] Translation service integration (Google Translate, DeepL)
-- [ ] Implement `/summary` endpoint
+- [ ] Implement `/diarization` endpoint with speaker identification
 - [ ] Multi-language support
 - [ ] Language auto-detection improvements
-- [ ] Configurable summary lengths
+- [ ] Speaker segmentation and labeling
 
 ### 💭 Future Considerations
 - [ ] Database integration for storing transcriptions
@@ -472,7 +472,7 @@ This project is in active development. Contributions, suggestions, and feedback 
 
 ### Areas for Contribution
 - Translation service integration
-- Summarization algorithm improvements
+- Speaker diarization implementation
 - Additional Whisper model configurations
 - Performance optimizations
 - Documentation enhancements

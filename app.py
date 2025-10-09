@@ -2,7 +2,8 @@ import os
 from flask import Flask
 from flask_cors import CORS
 from dotenv import load_dotenv
-from routes.translate import translate_bp, init_whisper_model
+from routes.transcription import transcription_bp, init_whisper_model
+from routes.diarization import diarization_bp
 
 # Load environment variables
 load_dotenv()
@@ -16,7 +17,8 @@ with app.app_context():
     init_whisper_model()
 
 # Register blueprints
-app.register_blueprint(translate_bp, url_prefix='/api/translate')
+app.register_blueprint(transcription_bp, url_prefix='/api/translate')
+app.register_blueprint(diarization_bp, url_prefix='/api/translate')
 
 # Health check endpoint
 @app.route('/health', methods=['GET'])

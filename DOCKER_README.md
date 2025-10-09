@@ -61,9 +61,9 @@ curl http://localhost:3000/health
 
 ---
 
-### 2. Verbatim Translation (Live Streaming)
+### 2. Live Transcription (Streaming)
 ```bash
-POST /api/translate/verbatim
+POST /api/translate/transcription
 ```
 
 **Description:** Real-time audio transcription using OpenAI Whisper. Returns Server-Sent Events (SSE) stream with live transcription updates.
@@ -79,7 +79,7 @@ POST /api/translate/verbatim
 
 **Example:**
 ```bash
-curl -X POST http://localhost:3000/api/translate/verbatim \
+curl -X POST http://localhost:3000/api/translate/transcription \
   -H "Content-Type: application/octet-stream" \
   -H "X-Source-Language: en" \
   -H "X-Sample-Rate: 16000" \
@@ -106,28 +106,30 @@ data: {"type": "final", "text": "Hello, how are you?", "timestamp": "2024-01-01T
 
 ---
 
-### 3. Summary Translation
+### 3. Speaker Diarization
 ```bash
-POST /api/translate/summary
+POST /api/translate/diarization
 ```
 
-**Description:** Transcribes, translates, and summarizes audio.
+**Description:** Transcribes audio and identifies different speakers (speaker diarization).
 
 **Request:**
 - **Content-Type:** `application/octet-stream`
 - **Headers:**
   - `X-Source-Language`: Source language code (optional, default: auto-detect)
-  - `X-Target-Language`: Target language code (optional, default: en)
-  - `X-Summary-Length`: `short` | `medium` | `long` (optional, default: medium)
+  - `X-Sample-Rate`: Sample rate in Hz (optional, default: 16000)
+  - `X-Min-Speakers`: Minimum number of speakers (optional, default: 1)
+  - `X-Max-Speakers`: Maximum number of speakers (optional, default: 10)
 - **Body:** Raw audio bytes
 
 **Example:**
 ```bash
-curl -X POST http://localhost:3000/api/translate/summary \
+curl -X POST http://localhost:3000/api/translate/diarization \
   -H "Content-Type: application/octet-stream" \
   -H "X-Source-Language: en" \
-  -H "X-Target-Language: es" \
-  -H "X-Summary-Length: medium" \
+  -H "X-Sample-Rate: 16000" \
+  -H "X-Min-Speakers: 1" \
+  -H "X-Max-Speakers: 5" \
   --data-binary @audio.wav
 ```
 
@@ -136,12 +138,23 @@ curl -X POST http://localhost:3000/api/translate/summary \
 {
   "success": true,
   "data": {
-    "originalText": "Full transcription text here...",
-    "translatedText": "Full translated text here...",
-    "summary": "Summarized version of the content",
+    "transcription": "Full transcription text here...",
+    "speakers": [
+      {
+        "speaker_id": "SPEAKER_00",
+        "text": "Speaker 00's text",
+        "start": 0.0,
+        "end": 5.2
+      },
+      {
+        "speaker_id": "SPEAKER_01",
+        "text": "Speaker 01's text",
+        "start": 5.5,
+        "end": 12.3
+      }
+    ],
     "sourceLanguage": "en",
-    "targetLanguage": "es",
-    "summaryLength": "medium",
+    "numSpeakers": 2,
     "timestamp": "2024-01-01T00:00:00.000000"
   }
 }
@@ -171,7 +184,7 @@ All endpoints may return error responses in the following format:
 
 ### Implemented Features
 
-✅ **Verbatim Endpoint (`/api/translate/verbatim`):**
+✅ **Transcription Endpoint (`/api/translate/transcription`):**
 - Real-time audio transcription using OpenAI Whisper (base model)
 - Server-Sent Events (SSE) streaming
 - Multi-threaded audio processing
@@ -181,39 +194,49 @@ All endpoints may return error responses in the following format:
 
 ### Not Yet Implemented
 
-❌ **Translation:** The verbatim endpoint currently only transcribes audio. Translation to target language is not implemented.
+❌ **Translation:** The transcription endpoint currently only transcribes audio. Translation to target language is not implemented.
 
-❌ **Summary Endpoint (`/api/translate/summary`):** Contains TODO placeholders for:
-- Whisper transcription (lines 221-224 in routes/translate.py)
-- Translation service (lines 226-228)
-- Summarization logic (lines 230-232)
+❌ **Diarization Endpoint (`/api/translate/diarization`):** Contains TODO placeholders for:
+- Whisper transcription integration
+- Speaker diarization logic (e.g., using pyannote.audio)
+- Speaker segmentation and identification
 
 ### Implementation Guide for Remaining Features
 
-To complete the `/api/translate/summary` endpoint in `routes/translate.py`:
+To complete the `/api/translate/diarization` endpoint in `routes/translate.py`:
 
-1. **Transcription (lines 221-224):**
+1. **Transcription:**
    ```python
    # Use the global whisper_model
    result = whisper_model.transcribe(temp_audio_path, fp16=False)
-   original_text = result["text"]
+   transcription = result["text"]
    ```
 
-2. **Translation (lines 226-228):**
+2. **Speaker Diarization:**
+   ```python
+   # Example using pyannote.audio:
+   from pyannote.audio import Pipeline
+   diarization_pipeline = Pipeline.from_pretrained("pyannote/speaker-diarization")
+   diarization_result = diarization_pipeline(temp_audio_path)
+
+   # Process diarization segments
+   speakers = []
+   for turn, _, speaker in diarization_result.itertracks(yield_label=True):
+       speakers.append({
+           "speaker_id": speaker,
+           "text": "TODO: Align with transcription",
+           "start": turn.start,
+           "end": turn.end
+       })
+   ```
+
+3. **Translation (for transcription endpoint):**
    ```python
    # Example using Google Translate:
    from googletrans import Translator
    translator = Translator()
-   translated = translator.translate(original_text, src=source_language, dest=target_language)
+   translated = translator.translate(transcription, src=source_language, dest=target_language)
    translated_text = translated.text
-   ```
-
-3. **Summarization (lines 230-232):**
-   ```python
-   # Example using transformers:
-   from transformers import pipeline
-   summarizer = pipeline("summarization")
-   summary = summarizer(translated_text, max_length=130, min_length=30)[0]['summary_text']
    ```
 
 ---
@@ -300,10 +323,10 @@ docker logs -f live-translate-api
 
 ## Next Steps
 
-1. ✅ ~~Implement Whisper transcription~~ (Completed for `/api/translate/verbatim`)
-2. Add translation service to verbatim endpoint (Google Translate, DeepL, etc.)
-3. Complete the `/api/translate/summary` endpoint implementation
-4. Add summarization logic for summary endpoint
+1. ✅ ~~Implement Whisper transcription~~ (Completed for `/api/translate/transcription`)
+2. Add translation service to transcription endpoint (Google Translate, DeepL, etc.)
+3. Complete the `/api/translate/diarization` endpoint implementation
+4. Add speaker diarization logic (e.g., using pyannote.audio)
 5. Add authentication/API keys for production
 6. Implement rate limiting
 7. Add request logging and monitoring
