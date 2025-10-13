@@ -3,28 +3,28 @@ Flask==3.0.0
 Flask-CORS==4.0.0
 python-dotenv==1.0.0
 
-# Audio Transcription
+# Audio Transcription (Whisper)
 transformers>=4.40.0
 accelerate>=0.27.0
+sentencepiece  # Required for some Whisper models
 numpy
 
-# Audio Capture & Speech Detection
+# Speaker Diarization (Pyannote)
+torch>=2.0.0
+torchaudio
+pyannote.audio
+
+# Audio Processing
+soundfile  # For audio I/O
+noisereduce  # For noise reduction preprocessing
+
+# Audio Capture & Speech Detection (for live transcription testing)
 pyaudio
 webrtcvad
 SpeechRecognition
 
 # HTTP Client
 requests
-
-# Speaker Diarization
-torch>=2.0.0
-torchvision
-torchaudio
-pyannote.audio
-noisereduce
-
-# Audio Processing
-pydub
 
 # Production Server
 gunicorn==21.2.0

@@ -152,7 +152,7 @@ def diarize_audio():
         try:
             pipeline = Pipeline.from_pretrained(
                 "pyannote/speaker-diarization-3.1",
-                token=HUGGINGFACE_ACCESS_TOKEN
+                use_auth_token=HUGGINGFACE_ACCESS_TOKEN
             )
         except Exception as e:
             return jsonify({
@@ -180,7 +180,7 @@ def diarize_audio():
         # Process diarization results
         diarized_speech = []
 
-        for turn, speaker in diarization.speaker_diarization:
+        for turn, _, speaker in diarization.itertracks(yield_label=True):
             diarized_speech.append({
                 "speaker_id": speaker,
                 "start": float(turn.start),

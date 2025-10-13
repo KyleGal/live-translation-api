@@ -34,3 +34,8 @@ Thumbs.db
 .pytest_cache/
 .coverage
 htmlcov/
+
+# Audio recordings (keep directory structure but ignore audio files)
+recordings/*.wav
+recordings/*.mp3
+recordings/*.flac

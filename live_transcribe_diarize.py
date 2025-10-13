@@ -191,9 +191,6 @@ class LiveDiarizationStreamer:
             except KeyboardInterrupt:
                 print("\nStopping...")
                 break
-            # finally:
-            #     if self.is_running:
-            #         self.stop() 
 
         print("\n\nMono Transcription:")
         for line in transcription:
@@ -214,43 +211,6 @@ class LiveDiarizationStreamer:
         # Queue for transcription processing
         self.audio_queue.put(data)
 
-    def clean_up_audio(self, audio_data):
-        """Clean up audio after recording for better diarization and translation"""
-
-        # temp audio file that we can process
-        temp_filename = "temp_file.wav"
-        with wave.open(temp_filename, 'wb') as wf:
-            wf.setnchannels(CHANNELS)
-            wf.setsampwidth(self.audio.get_sample_size(FORMAT))
-            wf.setframerate(SAMPLE_RATE)
-            wf.writeframes(audio_data)
-
-        # Noise Reduction
-        temp_denoised = "temp_denoised.wav"
-
-        y, sr = sf.read(temp_filename)
-        reduced = nr.reduce_noise(y=y, sr=sr, prop_decrease=0.8)  # 0.6–0.9 typical
-        sf.write(temp_denoised, reduced, sr)
-
-        # Dereverberation
-
-        # Normalization
-
-        with wave.open(temp_denoised, 'rb') as wf:
-            # n_channels = wf.getnchannels()
-            # sampwidth = wf.getsampwidth()
-            # framerate = wf.getframerate()
-            n_frames = wf.getnframes()
-
-            audio_bytes = wf.readframes(n_frames)
-
-        # Convert to float32 NumPy array normalized between -1 and 1
-        audio_data = np.frombuffer(audio_bytes, dtype=np.int16).astype(np.float32) / 32768.0
-
-        os.remove(temp_filename)
-        os.remove(temp_denoised)
-        return audio_data
-
 
     def save_audio(self) -> Optional[str]:
         """Save recorded audio to WAV file and return filename"""
@@ -258,30 +218,23 @@ class LiveDiarizationStreamer:
             print("\nNo audio recorded to save.")
             return None
 
+        # Create recordings directory if it doesn't exist
+        os.makedirs('recordings', exist_ok=True)
+
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f"recording_{timestamp}.wav"
+        filename = f"recordings/recording_{timestamp}.wav"
 
         try:
             audio_data = b''.join(self.all_audio_frames)
 
             # raw audio
-            with wave.open("raw_"+filename, 'wb') as wf:
+            with wave.open(filename, 'wb') as wf:
                 wf.setnchannels(CHANNELS)
                 wf.setsampwidth(self.audio.get_sample_size(FORMAT))
                 wf.setframerate(SAMPLE_RATE)
                 wf.writeframes(audio_data)
-            
-            # post-hoc preprocessed audio
-            processed_audio_data = self.clean_up_audio(audio_data)
 
-            processed_filename = "processed_"+filename
-            with wave.open(processed_filename, 'wb') as wf:
-                wf.setnchannels(CHANNELS)
-                wf.setsampwidth(self.audio.get_sample_size(FORMAT))
-                wf.setframerate(SAMPLE_RATE)
-                wf.writeframes(processed_audio_data)
-
-            return processed_filename
+            return filename
         except Exception as e:
             print(f"\n❌ Error saving audio: {e}")
             return None
@@ -290,9 +243,12 @@ class LiveDiarizationStreamer:
         """Transcribe audio file with word-level timestamps"""
         print("\n🎙️  Running transcription with word timestamps...")
 
+        # Convert local path to container path
+        container_path = audio_path.replace('recordings/', '/app/recordings/')
+
         response = requests.post(
             self.transcription_url,
-            json={'audio_path': audio_path},
+            json={'audio_path': container_path},
             headers={'Content-Type': 'application/json'},
             timeout=600
         )
@@ -313,9 +269,12 @@ class LiveDiarizationStreamer:
         """Run speaker diarization on audio file"""
         print("\n📊 Running speaker diarization...")
 
+        # Convert local path to container path
+        container_path = audio_path.replace('recordings/', '/app/recordings/')
+
         response = requests.post(
             self.diarization_url,
-            json={'audio_path': audio_path},
+            json={'audio_path': container_path},
             headers={'Content-Type': 'application/json'},
             timeout=600
         )
@@ -398,11 +357,6 @@ class LiveDiarizationStreamer:
 
         segments = self.diarize_audio(audio_file)
         transcription, timestamps = self.transcribe_audio(audio_file)
-        # refined_segments = self.refine_boundaries_with_vad(audio_file, segments)
-        # assigned_words = self.assign_words_to_speakers(words, refined_segments)
-        # turns = self.create_speaker_turns(assigned_words)
-
-        # return turns
 
         last_segment = self.get_last_segment(segments)
 
