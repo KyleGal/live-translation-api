@@ -62,31 +62,31 @@ The implementation is inspired by the approach detailed in [Whisper + Pyannote: 
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                      Flask API Server                            │
-│                                                                   │
-│  ┌───────────────────────┐      ┌──────────────────────────┐   │
-│  │ /api/translate/       │      │ /api/translate/          │   │
-│  │ transcription         │      │ diarization              │   │
-│  │                       │      │                          │   │
-│  │ • OpenAI Whisper      │      │ • Pyannote.audio         │   │
-│  │ • large-v3-turbo      │      │ • speaker-diarization-3.1│   │
-│  │ • Chunk timestamps    │      │ • Speaker segments       │   │
-│  └───────────────────────┘      └──────────────────────────┘   │
-│                                                                   │
-│  ┌──────────────────────────────────────────────────────────┐  │
-│  │              Health Check: /health                        │  │
-│  └──────────────────────────────────────────────────────────┘  │
+│                      Flask API Server                           │
+│                                                                 │
+│  ┌───────────────────────┐      ┌──────────────────────────┐    │
+│  │ /api/translate/       │      │ /api/translate/          │    │
+│  │ transcription         │      │ diarization              │    │
+│  │                       │      │                          │    │
+│  │ • OpenAI Whisper      │      │ • Pyannote.audio         │    │
+│  │ • large-v3-turbo      │      │ • speaker-diarization-3.1│    │
+│  │ • Chunk timestamps    │      │ • Speaker segments       │    │
+│  └───────────────────────┘      └──────────────────────────┘    │
+│                                                                 │
+│  ┌──────────────────────────────────────────────────────────┐   │
+│  │              Health Check: /health                       │   │
+│  └──────────────────────────────────────────────────────────┘   │
 └─────────────────────────────────────────────────────────────────┘
                               ↑
                               │ HTTP/JSON
                               ↓
 ┌─────────────────────────────────────────────────────────────────┐
-│                 Client (live_transcribe_diarize.py)              │
-│                                                                   │
+│                 Client (live_transcribe_diarize.py)             │
+│                                                                 │
 │  1. Live Recording → VAD → Local Whisper Display                │
-│  2. Save Audio File                                              │
-│  3. POST /transcription → Get word chunks                        │
-│  4. POST /diarization → Get speaker segments                     │
+│  2. Save Audio File                                             │
+│  3. POST /transcription → Get word chunks                       │
+│  4. POST /diarization → Get speaker segments                    │
 │  5. Align chunks to speakers → Merge consecutive turns          │
 │  6. Display: [Speaker] Text segments                            │
 └─────────────────────────────────────────────────────────────────┘
@@ -112,12 +112,12 @@ Audio File
 └─────────────────────────┘
     ↓
 ┌─────────────────────────────────┐
-│  Timestamp-based Alignment       │
-│  For each chunk:                 │
-│    • Calculate overlap with each │
-│      speaker segment             │
-│    • Assign to speaker with max  │
-│      intersection                │
+│  Timestamp-based Alignment      │
+│  For each chunk:                │
+│    • Calculate overlap with each│
+│      speaker segment            │
+│    • Assign to speaker with max │
+│      intersection               │
 └─────────────────────────────────┘
     ↓
 ┌─────────────────────────┐
@@ -195,17 +195,17 @@ Speaker-attributed transcript
 
 2. **Build and run**
    ```bash
-   docker-compose up -d
+   docker compose up --build
    ```
 
 3. **Check logs**
    ```bash
-   docker-compose logs -f
+   docker compose logs -f
    ```
 
 4. **Stop**
    ```bash
-   docker-compose down
+   docker compose down
    ```
 
 ## Usage
@@ -242,14 +242,14 @@ Content-Type: application/json
 {
   "success": true,
   "data": {
-    "transcription": "Full text of the transcription",
+    "transcription": "Do or do not. There is no try.",
     "timestamps": [
       {
-        "text": " I stole the doll ones from my cousin.",
+        "text": "Do or do not.",
         "timestamp": [0.0, 2.0]
       },
       {
-        "text": " I tried my best your best is good",
+        "text": "There is no try.",
         "timestamp": [2.0, 7.04]
       }
     ],
@@ -429,10 +429,16 @@ Contributions welcome! Areas for improvement:
 - Add batch processing support
 - Improve error handling
 
+## Acknowledgments
+
+- Real-time audio recording and VAD implementation adapted from [whisper_real_time](https://github.com/davabase/whisper_real_time) by davabase
+- Diarization pipeline approach inspired by [Whisper + Pyannote: The Ultimate Solution for Speech Transcription](https://scalastic.io/en/whisper-pyannote-ultimate-speech-transcription/)
+- Built with [OpenAI Whisper](https://github.com/openai/whisper) and [Pyannote.audio](https://github.com/pyannote/pyannote-audio)
+
 ## License
 
-[Specify your license]
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ---
 
-**Last Updated:** October 12, 2025
+**Last Updated:** October 13, 2025
