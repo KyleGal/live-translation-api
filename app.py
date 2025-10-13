@@ -12,9 +12,17 @@ load_dotenv()
 app = Flask(__name__)
 CORS(app)
 
-# Initialize Whisper model at startup
+# Architecture Notes:
+# - Simple stateless API for transcription and diarization
+# - Models are loaded once at startup and shared across all requests (read-only)
+# - Transcription: POST /api/translate/transcription with {"audio_path": "/path/to/file.wav"}
+# - Diarization: POST /api/translate/diarization with {"audio_path": "/path/to/file.wav"}
+
+# Initialize Whisper model at startup (shared, read-only)
+print("Initializing Whisper model...")
 with app.app_context():
     init_whisper_model()
+print("Whisper initialization complete")
 
 # Register blueprints
 app.register_blueprint(transcription_bp, url_prefix='/api/translate')
@@ -23,12 +31,17 @@ app.register_blueprint(diarization_bp, url_prefix='/api/translate')
 # Health check endpoint
 @app.route('/health', methods=['GET'])
 def health_check():
+    """
+    Health check - returns server status
+    """
     from datetime import datetime
+
     return {
         'status': 'ok',
-        'timestamp': datetime.utcnow().isoformat()
+        'timestamp': datetime.now().isoformat()
     }
 
 if __name__ == '__main__':
     port = int(os.getenv('PORT', 3000))
-    app.run(host='0.0.0.0', port=port, debug=True)
+    debug_mode = os.getenv('FLASK_DEBUG', 'False').lower() == 'true'
+    app.run(host='0.0.0.0', port=port, debug=debug_mode, use_reloader=False)
